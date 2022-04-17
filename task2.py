@@ -1,39 +1,61 @@
-import socket 
-import sys
+import socket
 import time
 
-host=sys.argv[1]
-port = 1337
+operation = ""
+result = 0
 number = 0
+next_port = 1337
+IP = "10.10.155.74"
 
-while 1:
+#end the program once the loop is complete
+while next_port != 9765:
+	#try until port 1337 is open, ignore ConnectionRefusedError
 	try:
-		s = socket.socket()
-		s.connect((host,port))
-		if (port == 9765):
-			break
-		old_port = port
-		request = "GET / HTTP/1.1\r\nHost:%s\r\n\r\n" % host
-		s.send(request.encode())
-		response = s.recv(4096)
-		http_response = repr(response)
-		http_trim = http_response[167:]
-		http_trim = http_trim.replace('\'','')
-		data_list = list(http_trim.split(" "))
-		port = int(data_list[2])
-		print('Operation: '+data_list[0]+', number: '+ data_list[1]+', next port: '+ data_list[2])
-		if(port != old_port):
-			if(data_list[0] == 'add'):
-				number += float(data_list[1])
-			elif(data_list[0] == 'minus'):
-				number -= float(data_list[1])
-			elif(data_list[0] == 'multiply'):
-				number *= float(data_list[1])
-			elif(data_list[0] == 'divide'):
-				number /= float(data_list[1])
-		s.close()
-	except:
-		s.close()
-		pass
+		# create an INET, STREAMing socket
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		# attempting to connect to the web server on port 1337
+		s.connect((IP, int(next_port)))
+		#show if connection attempt was successful
+		print("Connected!")
+		# send some data to receive data
+		request = "GET / HTTP/1.1\r\nHost:%s\r\n\r\n" % IP
+		s.send(request.encode()) 
+		# get some data. call the function twice here because once only returns the header.
+		response = s.recv(1024)
+		response = s.recv(1024)
+		#format the response
+		response = response.decode().split("\r\n\r\n")[1].split(" ")
+		#print response for visibility
+		print(response)
+		#define variables
+		operation = response[0]
+		number = float(response[1])
+		next_port = response[2]
+		#
+		if operation == "add":
+			result += number
+		elif operation == "minus":
+			result -= number
+		elif operation == "multiply":
+			result *= number
+		elif operation == "divide":
+			result /= number
+		else:
+			continue
 
-print(number)
+		s.close()
+		#print temporary result for visibility
+		print(result)
+		#wait until new port is available
+		time.sleep(3.5)
+
+	#exception: if port is closed, then try again
+	except ConnectionRefusedError:
+		#print("port closed")
+		#new try every 0.2 seconds
+		time.sleep(0.2)
+	#sometimes there is a timeout error. then we wait until the current port is open again. Internet connection stable?
+	except TimeoutError:
+		time.sleep(0.2)
+
+print("You have reached the end! Here is your flag: "+ int(round(result, 2)))
